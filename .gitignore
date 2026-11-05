@@ -1,0 +1,7 @@
+.env
+.env.*
+!.env.example
+.n8n/
+.n8n-local/
+node_modules/
+*.log

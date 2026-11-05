@@ -1,0 +1,15 @@
+{
+  "name": "n8n-automacoes",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fluxos n8n de demonstração com dados fictícios",
+  "scripts": {
+    "n8n": "node tests/n8n-local.mjs",
+    "test": "node tests/run.mjs",
+    "prints": "node tests/capturar-prints.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

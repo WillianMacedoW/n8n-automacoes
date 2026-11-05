@@ -1,0 +1,18 @@
+{
+  "id": "evt-exemplo-0001",
+  "event": "PURCHASE_APPROVED",
+  "version": "2.0.0",
+  "data": {
+    "product": { "id": 900001, "name": "Curso Planilhas na Prática" },
+    "buyer": {
+      "name": "Maria Exemplo",
+      "email": "maria.exemplo@example.com",
+      "checkout_phone": "+55 11 90000-0000"
+    },
+    "purchase": {
+      "transaction": "TX-EXEMPLO-0001",
+      "status": "APPROVED",
+      "price": { "value": 49.9, "currency_value": "BRL" }
+    }
+  }
+}

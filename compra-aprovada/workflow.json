@@ -1,0 +1,833 @@
+{
+  "name": "Compra aprovada (demonstração)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "compra-aprovada",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook Compra",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "00000000-0000-4000-8000-000000000001",
+      "id": "00000000-0000-4000-8000-000000000020"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "leftValue": "={{ Boolean($env.WEBHOOK_TOKEN) && $json.headers['x-webhook-token'] === $env.WEBHOOK_TOKEN }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Token válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        300
+      ],
+      "id": "00000000-0000-4000-8000-000000000021"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"nao_autorizado\" } }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "name": "Responder 401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        520
+      ],
+      "id": "00000000-0000-4000-8000-000000000022"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000003",
+              "leftValue": "={{ $json.body?.event === 'PURCHASE_APPROVED' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Compra aprovada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ],
+      "id": "00000000-0000-4000-8000-000000000023"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"ignorado\", \"evento\": $json.body?.event ?? null } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder ignorado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        520
+      ],
+      "id": "00000000-0000-4000-8000-000000000024"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Traduz o payload (formato inspirado em plataformas de pagamento) para um objeto interno.\nconst body = $input.first().json.body ?? {};\nconst data = body.data ?? {};\nconst comprador = data.buyer ?? {};\nconst compra = data.purchase ?? {};\n\n// Mapa de produto para plano. Ids fictícios.\nconst PLANOS = { 900001: 'mensal', 900002: 'anual' };\n\nfunction normalizarTelefone(bruto) {\n  let d = String(bruto ?? '').replace(/\\D/g, '').replace(/^00/, '');\n  if (d.length === 10 || d.length === 11) d = '55' + d; // veio sem DDI\n  // Celular antigo, sem o nono dígito\n  if (d.length === 12 && d.startsWith('55') && /[6-9]/.test(d[4])) d = d.slice(0, 4) + '9' + d.slice(4);\n  // Aceita só celular brasileiro: 55 + DDD + 9 + 8 dígitos\n  return /^55[1-9][1-9]9\\d{8}$/.test(d) ? d : null;\n}\n\nconst telefone = normalizarTelefone(comprador.checkout_phone);\nconst email = String(comprador.email ?? '').trim().toLowerCase();\nconst transacao = compra.transaction ?? null;\n\nreturn [{ json: {\n  payloadValido: Boolean(transacao && email.includes('@')),\n  chaveEvento: body.event + ':' + transacao,\n  transacao,\n  nome: String(comprador.name ?? '').trim(),\n  primeiroNome: String(comprador.name ?? '').trim().split(/\\s+/)[0] || 'tudo bem',\n  email,\n  telefone,\n  telefoneValido: telefone !== null,\n  produtoId: data.product?.id ?? null,\n  produto: data.product?.name ?? null,\n  plano: PLANOS[data.product?.id] ?? 'desconhecido',\n} }];"
+      },
+      "name": "Normalizar dados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ],
+      "id": "00000000-0000-4000-8000-000000000025"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000004",
+              "leftValue": "={{ $json.payloadValido }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Payload válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        300
+      ],
+      "id": "00000000-0000-4000-8000-000000000026"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"payload_invalido\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "name": "Responder 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        520
+      ],
+      "id": "00000000-0000-4000-8000-000000000027"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Só lê. A marcação acontece depois do CRM e do WhatsApp, para que uma\n// reentrega após falha seja processada de novo em vez de virar \"duplicado\".\nconst estado = $getWorkflowStaticData('global');\nconst item = $input.first().json;\nconst vistos = estado.eventosProcessados ?? {};\nreturn [{ json: { ...item, eventoNovo: !vistos[item.chaveEvento] } }];"
+      },
+      "name": "Checar duplicado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ],
+      "id": "00000000-0000-4000-8000-000000000028"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000005",
+              "leftValue": "={{ $json.eventoNovo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Evento novo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        300
+      ],
+      "id": "00000000-0000-4000-8000-000000000029"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"duplicado\", \"transacao\": $json.transacao } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder duplicado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        520
+      ],
+      "id": "00000000-0000-4000-8000-000000000030"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "00000000-0000-4000-8000-000000000006",
+                    "leftValue": "={{ $json.plano }}",
+                    "rightValue": "mensal",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Mensal"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "00000000-0000-4000-8000-000000000007",
+                    "leftValue": "={{ $json.plano }}",
+                    "rightValue": "anual",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Anual"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Desconhecido"
+        }
+      },
+      "name": "Plano",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1540,
+        300
+      ],
+      "id": "00000000-0000-4000-8000-000000000031"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "00000000-0000-4000-8000-000000000008",
+              "name": "tagCrm",
+              "value": "aluno-mensal",
+              "type": "string"
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000009",
+              "name": "diasAcesso",
+              "value": 30,
+              "type": "number"
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000010",
+              "name": "mensagem",
+              "value": "=Olá, {{ $json.primeiroNome }}! Sua assinatura mensal do {{ $json.produto }} foi confirmada. Seu acesso vale por 30 dias e renova a cada pagamento.",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "name": "Plano mensal",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1760,
+        140
+      ],
+      "id": "00000000-0000-4000-8000-000000000032"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "00000000-0000-4000-8000-000000000011",
+              "name": "tagCrm",
+              "value": "aluno-anual",
+              "type": "string"
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000012",
+              "name": "diasAcesso",
+              "value": 365,
+              "type": "number"
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000013",
+              "name": "mensagem",
+              "value": "=Olá, {{ $json.primeiroNome }}! Seu plano anual do {{ $json.produto }} foi confirmado. Seu acesso vale por 12 meses e inclui a mentoria em grupo.",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "name": "Plano anual",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1760,
+        320
+      ],
+      "id": "00000000-0000-4000-8000-000000000033"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"plano_desconhecido\", \"produtoId\": $json.produtoId } }}",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "name": "Responder 422",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        520
+      ],
+      "id": "00000000-0000-4000-8000-000000000034"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "00000000-0000-4000-8000-000000000014",
+              "name": "tags",
+              "value": "={{ [$json.tagCrm].concat($json.telefoneValido ? [] : ['telefone-invalido']) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "name": "Montar pedido",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1980,
+        230
+      ],
+      "id": "00000000-0000-4000-8000-000000000035"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.CRM_BASE_URL || 'https://crm.example.com') + '/contacts/upsert' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.CRM_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"email\": $json.email, \"nome\": $json.nome, \"telefone\": $json.telefone, \"plano\": $json.plano, \"diasAcesso\": $json.diasAcesso, \"tags\": $json.tags, \"transacao\": $json.transacao } }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "Criar ou atualizar no CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2200,
+        230
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput",
+      "id": "00000000-0000-4000-8000-000000000036"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"erro\", \"etapa\": \"crm\" } }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "name": "Responder falha CRM",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2200,
+        520
+      ],
+      "id": "00000000-0000-4000-8000-000000000037"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00000000-0000-4000-8000-000000000015",
+              "leftValue": "={{ $('Montar pedido').first().json.telefoneValido }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Telefone válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2420,
+        230
+      ],
+      "id": "00000000-0000-4000-8000-000000000038"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.WHATSAPP_BASE_URL || 'https://whatsapp.example.com') + '/messages' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WHATSAPP_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"para\": $('Montar pedido').first().json.telefone, \"texto\": $('Montar pedido').first().json.mensagem } }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "Enviar WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        140
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput",
+      "id": "00000000-0000-4000-8000-000000000039"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"erro\", \"etapa\": \"whatsapp\" } }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "name": "Responder falha WhatsApp",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2640,
+        520
+      ],
+      "id": "00000000-0000-4000-8000-000000000040"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pedido = $('Montar pedido').first().json;\nconst estado = $getWorkflowStaticData('global');\nconst vistos = estado.eventosProcessados ?? {};\nvistos[pedido.chaveEvento] = new Date().toISOString();\n\n// Mantém só os 1000 mais recentes para o static data não crescer sem limite.\nconst chaves = Object.keys(vistos);\nfor (const chave of chaves.slice(0, Math.max(0, chaves.length - 1000))) delete vistos[chave];\nestado.eventosProcessados = vistos;\n\nreturn [{ json: {\n  status: pedido.telefoneValido ? 'processado' : 'processado_sem_whatsapp',\n  transacao: pedido.transacao,\n  plano: pedido.plano,\n  whatsapp: pedido.telefoneValido ? 'enviado' : 'nao_enviado',\n  motivo: pedido.telefoneValido ? null : 'telefone_invalido',\n} }];"
+      },
+      "name": "Marcar processado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        230
+      ],
+      "id": "00000000-0000-4000-8000-000000000041"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Responder sucesso",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        3080,
+        230
+      ],
+      "id": "00000000-0000-4000-8000-000000000042"
+    }
+  ],
+  "connections": {
+    "Webhook Compra": {
+      "main": [
+        [
+          {
+            "node": "Token válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token válido?": {
+      "main": [
+        [
+          {
+            "node": "Compra aprovada?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder 401",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compra aprovada?": {
+      "main": [
+        [
+          {
+            "node": "Normalizar dados",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder ignorado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar dados": {
+      "main": [
+        [
+          {
+            "node": "Payload válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payload válido?": {
+      "main": [
+        [
+          {
+            "node": "Checar duplicado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder 400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checar duplicado": {
+      "main": [
+        [
+          {
+            "node": "Evento novo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evento novo?": {
+      "main": [
+        [
+          {
+            "node": "Plano",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder duplicado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plano": {
+      "main": [
+        [
+          {
+            "node": "Plano mensal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Plano anual",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder 422",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plano mensal": {
+      "main": [
+        [
+          {
+            "node": "Montar pedido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plano anual": {
+      "main": [
+        [
+          {
+            "node": "Montar pedido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar pedido": {
+      "main": [
+        [
+          {
+            "node": "Criar ou atualizar no CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar ou atualizar no CRM": {
+      "main": [
+        [
+          {
+            "node": "Telefone válido?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder falha CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telefone válido?": {
+      "main": [
+        [
+          {
+            "node": "Enviar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar processado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Marcar processado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder falha WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar processado": {
+      "main": [
+        [
+          {
+            "node": "Responder sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false,
+  "tags": []
+}
